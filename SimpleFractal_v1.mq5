@@ -62,6 +62,7 @@ enum ENUM_FRACTAL_TYPE
 
 input int InpAdjacentCandles = 2;  // Number of adjacent candles (left and right)
 input ENUM_FRACTAL_TYPE InpFractalType = FRACTAL_BILL_WILLIAMS; // Fractal Type
+input bool InpUseTwoPrevFractals = false; // Compare strict against 2 previous fractals
 input bool InpShowSimpleFractals = false;  // Show simple fractals (gray)
 input bool InpShowHHHL = true;  // Show HH and HL fractals
 input bool InpShowLHLL = true;  // Show LH and LL fractals
@@ -77,6 +78,8 @@ double BufferDownFractal[]; // All Down Fractals
 //--- Global variables for tracking previous fractals
 double g_prevUpFractal = 0.0;    // Previous up fractal value
 double g_prevDownFractal = 0.0;  // Previous down fractal value
+double g_prevPrevUpFractal = 0.0; // 2nd Previous up fractal
+double g_prevPrevDownFractal = 0.0; // 2nd Previous down fractal
 
 //+------------------------------------------------------------------+
 //| Custom indicator initialization function                         |
@@ -126,6 +129,8 @@ int OnInit()
     //--- Initialize global variables
     g_prevUpFractal = EMPTY_VALUE;
     g_prevDownFractal = EMPTY_VALUE;
+    g_prevPrevUpFractal = EMPTY_VALUE;
+    g_prevPrevDownFractal = EMPTY_VALUE;
     
     //--- Set indicator name
     string typeStr = (InpFractalType == FRACTAL_BILL_WILLIAMS) ? "BW" : "Reg";
@@ -159,6 +164,8 @@ int OnCalculate(const int rates_total,
         limit = InpAdjacentCandles;  // Start from first valid bar
         g_prevUpFractal = EMPTY_VALUE;       // Reset global variables on first run
         g_prevDownFractal = EMPTY_VALUE;
+        g_prevPrevUpFractal = EMPTY_VALUE;
+        g_prevPrevDownFractal = EMPTY_VALUE;
     }
     else
     {
@@ -241,13 +248,22 @@ int OnCalculate(const int rates_total,
             //--- Classify as HH or LH based on previous fractal
             if(g_prevUpFractal != EMPTY_VALUE)
             {
-                if(high[i] > g_prevUpFractal)
+               bool isHH = (high[i] > g_prevUpFractal);
+               bool isLH = (high[i] < g_prevUpFractal);
+               
+               if (InpUseTwoPrevFractals && g_prevPrevUpFractal != EMPTY_VALUE)
+               {
+                  if (high[i] <= g_prevPrevUpFractal) isHH = false;
+                  if (high[i] >= g_prevPrevUpFractal) isLH = false;
+               }
+
+                if(isHH)
                 {
                     // Higher High
                     if(InpShowHHHL)
                         BufferHH[i] = high[i];
                 }
-                else
+                else if (isLH)
                 {
                     // Lower High
                     if(InpShowLHLL)
@@ -255,7 +271,8 @@ int OnCalculate(const int rates_total,
                 }
             }
             
-            //--- Update global variable
+            //--- Update global variables
+            g_prevPrevUpFractal = g_prevUpFractal;
             g_prevUpFractal = high[i];
         }
         
@@ -268,13 +285,22 @@ int OnCalculate(const int rates_total,
             //--- Classify as HL or LL based on previous fractal
             if(g_prevDownFractal != EMPTY_VALUE)
             {
-                if(low[i] > g_prevDownFractal)
+               bool isHL = (low[i] > g_prevDownFractal);
+               bool isLL = (low[i] < g_prevDownFractal);
+               
+               if (InpUseTwoPrevFractals && g_prevPrevDownFractal != EMPTY_VALUE)
+               {
+                  if (low[i] <= g_prevPrevDownFractal) isHL = false;
+                  if (low[i] >= g_prevPrevDownFractal) isLL = false;
+               }
+
+                if(isHL)
                 {
                     // Higher Low
                     if(InpShowHHHL)
                         BufferHL[i] = low[i];
                 }
-                else
+                else if(isLL)
                 {
                     // Lower Low
                     if(InpShowLHLL)
@@ -282,7 +308,8 @@ int OnCalculate(const int rates_total,
                 }
             }
             
-            //--- Update global variable
+            //--- Update global variables
+            g_prevPrevDownFractal = g_prevDownFractal;
             g_prevDownFractal = low[i];
         }
     }
